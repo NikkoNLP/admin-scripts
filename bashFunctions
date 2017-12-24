@@ -1,0 +1,68 @@
+#!/bin/bash
+# Author: Nikko Pedersen
+# Date: 12/24/2017
+# Purpose: Create basic functions for bash scripting
+#=====================================================
+### Check whether the OS is redhat or ubuntu based
+checkOS () {
+	if [[ -f /etc/redhat-release ]] || [[ -f /bin/yum ]];then
+        	OS=redhat
+		distro=$(cat /etc/redhat-release)
+	elif [[ -f /etc/lsb-release ]]; then
+        	OS=ubuntu
+		distro=$(cat /etc/os-release  | grep "^PRETTY_NAME=" | cut -d\" -f2)
+	else
+        	echo "Cannot Determine OS Version"
+		exit 1
+	fi
+}
+
+### Returns (in MB) RAM and Swap use
+memUse () {
+	totalRam=$(expr $(grep "^MemTotal:" /proc/meminfo | awk '{print $2}') / 1000)
+	freeRam=$(expr $(grep "^MemFree:" /proc/meminfo | awk '{print $2}') / 1000)
+	availableRam=$(expr $(grep "^MemAvailable:" /proc/meminfo | awk '{print $2}') / 1000)
+	bufferRam=$(expr $(grep "^Buffers:" /proc/meminfo | awk '{print $2}') / 1000)
+	cachedRam=$(expr $(grep "^Cached:" /proc/meminfo | awk '{print $2}') / 1000)
+	swapTotal=$(expr $(grep "^SwapTotal:" /proc/meminfo | awk '{print $2}') / 1000)
+	swapCached=$(expr $(grep "^SwapCached:" /proc/meminfo | awk '{print $2}') / 1000)
+	swapFree=$(expr $(grep "^SwapFree:" /proc/meminfo | awk '{print $2}') / 1000)
+}
+
+### Return Number and Speed of CPUs
+cpuInfo () {
+	cpuNumber=$(cat /proc/cpuinfo | grep "^processor" | wc -l)
+	cpuSpeed=$(cat /proc/cpuinfo | grep "cpu MHz" | uniq | awk '{print $4}')
+}
+
+### Obtain a list of disks/partitions on the system
+## You can call all disks with 'echo ${diskList[@]}'
+# Also run for loops like 'for i in ${diskList[@]};do echo $i;done'
+disks () {
+	diskList=()
+	c=0
+	for disk in $(cat /proc/partitions | awk '{print $4}' | egrep -v "name|^$");do
+		diskList+=($disk)
+		c=$(expr $c + 1)
+	done
+}
+
+### Returns disk stats in MB for each partition and disk
+## Variables for vda1 for example will be: $vda1Used, $vda1Avail, $vda1PercUsed
+diskUse () {
+	disks
+	for i in ${diskList[@]};do
+		export $(echo ""$i"Used")=$(df -m /dev/$i | grep "$i" | awk '{print $3}')
+		export $(echo ""$i"Avail")=$(df -m /dev/$i | grep "$i" | awk '{print $4}')
+		export $(echo ""$i"PercUsed")=$(df -m /dev/$i | grep "$i" | awk '{print $5}')
+	done
+}
+
+
+### Return Software Firewall
+#firewallCheck () {
+	
+
+#}
+
+### 

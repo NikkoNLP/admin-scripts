@@ -3,7 +3,7 @@
 # Revised: 12/17/2017
 # Purpose: Provides DNS for domain passed
 # Execute: python dnslookup.py <domain.com>
-# Set Bash alias: alias dns='python /home/git/admin-scripts/nifty-scripts/dnslookup.py'
+# Set Bash alias: alias dns='python /path/to/dnslookup.py'
 # ---------------------------------------
 ### Imports
 import dns.resolver

@@ -3,7 +3,7 @@
 # Revised: 12/17/2017
 # Purpose: Prints the Geo Location of an IP passed
 # Execute: python geoip.py <ip>
-# Set Bash alias: alias geoip='python /home/git/admin-scripts/nifty-scripts/geoip.py'
+# Set Bash alias: alias geoip='python /path/to/geoip.py'
 # ---------------------------------------
 ### Imports
 from sys import argv
