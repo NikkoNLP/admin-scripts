@@ -1,68 +1,204 @@
-#!/bin/bash
-# Author: Nikko Pedersen
-# Date: 12/24/2017
-# Purpose: Create basic functions for bash scripting
-#=====================================================
 ### Check whether the OS is redhat or ubuntu based
-checkOS () {
-	if [[ -f /etc/redhat-release ]] || [[ -f /bin/yum ]];then
-        	OS=redhat
-		distro=$(cat /etc/redhat-release)
-	elif [[ -f /etc/lsb-release ]]; then
-        	OS=ubuntu
-		distro=$(cat /etc/os-release  | grep "^PRETTY_NAME=" | cut -d\" -f2)
-	else
-        	echo "Cannot Determine OS Version"
-		exit 1
-	fi
+commands () {
+        echo $(for i in $(grep "^[a-Z]* () {" sourcefile | awk '{print $1}');do echo "$i";done)
 }
-
+checkOS () {
+        if [[ -f /etc/redhat-release ]] || [[ -f /bin/yum ]];then
+                OS=redhat
+                distro=$(cat /etc/redhat-release)
+        elif [[ -f /etc/lsb-release ]]; then
+                OS=ubuntu
+                distro=$(cat /etc/os-release  | grep "^PRETTY_NAME=" | cut -d\" -f2)
+        else
+                echo "Cannot Determine OS Version"
+                exit 1
+        fi
+}
 ### Returns (in MB) RAM and Swap use
 memUse () {
-	totalRam=$(expr $(grep "^MemTotal:" /proc/meminfo | awk '{print $2}') / 1000)
-	freeRam=$(expr $(grep "^MemFree:" /proc/meminfo | awk '{print $2}') / 1000)
-	availableRam=$(expr $(grep "^MemAvailable:" /proc/meminfo | awk '{print $2}') / 1000)
-	bufferRam=$(expr $(grep "^Buffers:" /proc/meminfo | awk '{print $2}') / 1000)
-	cachedRam=$(expr $(grep "^Cached:" /proc/meminfo | awk '{print $2}') / 1000)
-	swapTotal=$(expr $(grep "^SwapTotal:" /proc/meminfo | awk '{print $2}') / 1000)
-	swapCached=$(expr $(grep "^SwapCached:" /proc/meminfo | awk '{print $2}') / 1000)
-	swapFree=$(expr $(grep "^SwapFree:" /proc/meminfo | awk '{print $2}') / 1000)
+        totalRam=$(expr $(grep "^MemTotal:" /proc/meminfo | awk '{print $2}') / 1000)
+        freeRam=$(expr $(grep "^MemFree:" /proc/meminfo | awk '{print $2}') / 1000)
+        availableRam=$(expr $(grep "^MemAvailable:" /proc/meminfo | awk '{print $2}') / 1000)
+        bufferRam=$(expr $(grep "^Buffers:" /proc/meminfo | awk '{print $2}') / 1000)
+        cachedRam=$(expr $(grep "^Cached:" /proc/meminfo | awk '{print $2}') / 1000)
+        swapTotal=$(expr $(grep "^SwapTotal:" /proc/meminfo | awk '{print $2}') / 1000)
+        swapCached=$(expr $(grep "^SwapCached:" /proc/meminfo | awk '{print $2}') / 1000)
+        swapFree=$(expr $(grep "^SwapFree:" /proc/meminfo | awk '{print $2}') / 1000)
 }
-
 ### Return Number and Speed of CPUs
 cpuInfo () {
-	cpuNumber=$(cat /proc/cpuinfo | grep "^processor" | wc -l)
-	cpuSpeed=$(cat /proc/cpuinfo | grep "cpu MHz" | uniq | awk '{print $4}')
+        cpuNumber=$(cat /proc/cpuinfo | grep "^processor" | wc -l)
+        cpuSpeed=$(cat /proc/cpuinfo | grep "cpu MHz" | uniq | awk '{print $4}')
 }
-
 ### Obtain a list of disks/partitions on the system
 ## You can call all disks with 'echo ${diskList[@]}'
 # Also run for loops like 'for i in ${diskList[@]};do echo $i;done'
 disks () {
-	diskList=()
-	c=0
-	for disk in $(cat /proc/partitions | awk '{print $4}' | egrep -v "name|^$");do
-		diskList+=($disk)
-		c=$(expr $c + 1)
-	done
+        diskList=()
+        c=0
+        for disk in $(cat /proc/partitions | awk '{print $4}' | egrep -v "name|^$");do
+                diskList+=($disk)
+                c=$(expr $c + 1)
+        done
 }
-
 ### Returns disk stats in MB for each partition and disk
 ## Variables for vda1 for example will be: $vda1Used, $vda1Avail, $vda1PercUsed
 diskUse () {
-	disks
-	for i in ${diskList[@]};do
-		export $(echo ""$i"Used")=$(df -m /dev/$i | grep "$i" | awk '{print $3}')
-		export $(echo ""$i"Avail")=$(df -m /dev/$i | grep "$i" | awk '{print $4}')
-		export $(echo ""$i"PercUsed")=$(df -m /dev/$i | grep "$i" | awk '{print $5}')
-	done
+        disks
+        for i in ${diskList[@]};do
+                export $(echo ""$i"Used")=$(df -m /dev/$i | grep "$i" | awk '{print $3}')
+                export $(echo ""$i"Avail")=$(df -m /dev/$i | grep "$i" | awk '{print $4}')
+                export $(echo ""$i"PercUsed")=$(df -m /dev/$i | grep "$i" | awk '{print $5}')
+        done
+}
+### Return Software Firewall
+firewallCheck () {
+        firewall=$(systemctl list-unit-files | egrep -i "csf|firewalld|ufw|iptables" | grep enabled | cut -d. -f1)
+        if [[ -z $firewall ]];then
+                firewall="iptables"
+        fi
 }
 
+### Check for software that is enabled on the server
+softwareCheck () {
+        # Check System Type (sysvinit or systemd)
+        if [[ -f /bin/systemctl ]];then
+                systemType="systemd"
+	elif [[ -f /usr/sbin/update-rc.d ]];then
+		systemType="upstart"
+        elif [[ -f /sbin/chkconfig ]];then
+                systemType="sysvinit"
+        fi
+        # Apache
+        if [[ $systemType == "sysvinit" ]];then
+                httpdService=$(systemctl list-unit-files | grep "httpd" | awk '{print $2}')
+        else
+                httpdService=$(if [[ -f $(find /etc/rc*.d/ -iname *apache2 -o -iname *httpd | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # Nginx
+        if [[ $systemType == "sysvinit" ]];then
+                nginxService=$(systemctl list-unit-files | grep "nginx" | awk '{print $2}')
+        else
+                nginxService=$(if [[ -f $(find /etc/rc*.d/ -iname *nginx | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # PHP-FPM
+        if [[ $systemType == "sysvinit" ]];then
+                phpFpmService=$(systemctl list-unit-files | grep "php" | awk '{print $2}')
+        else
+                phpFpmService=$(if [[ -f $(find /etc/rc*.d/ -iname *php* | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # Mysql
+        if [[ $systemType == "sysvinit" ]];then
+                mysqlService=$(systemctl list-unit-files | grep -i "mysql|mariadb.service" | awk '{print $2}')
+        else
+                mysqlService=$(if [[ -f $(find /etc/rc*.d/ -iname *mysql* -o -iname *mariadb* | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # Selinux
+        selinuxService=$(cat /etc/selinux/config  | egrep "^SELINUX=" | cut -d= -f2)
+        # Apparmor
+        if [[ -f /usr/sbin/apparmor_status ]];then
+                apparmorService="enabled"
+        else
+                apparmorService="disabled"
+        fi
+        # HAProxy
+        if [[ $systemType == "sysvinit" ]];then
+                haproxyService=$(systemctl list-unit-files | grep "haproxy" | awk '{print $2}')
+        else
+                haproxyService=$(if [[ -f $(find /etc/rc*.d/ -iname *haproxy* | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # KeepaliveD
+        if [[ $systemType == "sysvinit" ]];then
+                keepalivedService=$(systemctl list-unit-files | grep -i "keepalive" | awk '{print $2}')
+        else
+                keepalivedService=$(if [[ -f $(find /etc/rc*.d/ -iname *keepalive* | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # Docker
+        if [[ $systemType == "sysvinit" ]];then
+                dockerService=$(systemctl list-unit-files | grep -i "docker" | awk '{print $2}')
+        else
+                dockerService=$(if [[ -f $(find /etc/rc*.d/ -iname *docker* | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+        # Varnish
+        if [[ $systemType == "sysvinit" ]];then
+                varnishService=$(systemctl list-unit-files | grep -i "varnish" | awk '{print $2}')
+        else
+                varnishService=$(if [[ -f $(find /etc/rc*.d/ -iname *varnish* | head -n1) ]];then echo "Enabled";else echo "Disabled";fi)
+        fi
+}
+### Creates an array of the Apache Modules installed and running
+## You can call all mods with 'echo ${apacheMods[@]}'
+# Also run for loops like 'for i in ${apacheMods[@]};do echo $i;done'
+apacheModuleCheck () {
+        # Array of Apache modules
+        apacheMods=()
+        for mod in $(httpd -M 2>/dev/null | grep -v "Loaded" | awk '{print $1}');do
+                apacheMods+=($mod)
+        done
+}
+### Creates an array of the PHP Modules installed and running
+## You can call all mods with 'echo ${phpMods[@]}'
+## Also run for loops like 'for i in ${phpMods[@]};do echo $i;done'
+phpModuleCheck () {
+        # Array of PHP modules
+        phpMods=()
+        for mod in $(php -m 2>/dev/null | egrep -v "^\[|^$");do
+                phpMods+=($mod)
+        done
+}
+###
+mysqlStats () {
+        # InnoDB Buffer Pool
+        innodbBufferPool=$(grep -R "innodb_buffer_pool_size" /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+        if [[ -z $innodbBufferPool ]];then
+                innodbBufferPool="default"
+        fi
+        # InnoDB Instances
+        innodbInstances=$(grep -R "innodb_buffer_pool_instances" /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+        if [[ -z $innodbInstances ]];then
+                innodbInstances="default"
+        fi
+        # InnoDB File Per Table
+        innodbFilePerTable=$(grep -R "innodb_file_per_table" /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+        if [[ -z $innodbFilePerTable ]];then
+                innodbFilePerTable="default"
+        fi
+        # Default storage engine
+        storageEngine=$(grep -R "default-storage-engine" /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+        if [[ -z $storageEngine ]];then
+                storageEngine="default"
+        fi
+        # Open file limit
+        openFileLimit=$(grep -R "default-storage-engine" /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+        if [[ -z $openFileLimit ]];then
+                openFileLimit="default"
+        fi
+}
 
-### Return Software Firewall
-#firewallCheck () {
-	
-
+#loadStats () {
+## 1 minute load average
+## 5 minute load average
+## 15 minute load average
+## Processes running
+## Zombie processes running
+## Processes in an uninterruptible sleep
 #}
+#
+#phpIniCheck () {
+## Max upload size
+## Max execution time
+#}
+#
+#apacheConfCheck () {
+## MPM running
+## Max ‘workers’
+## Domains running - 80
+## Domains running - 443
+## Default user/group running
+#}
+#
+#csfConfCheck () {
+## Has it been optimized :)
+#}
+#
 
-### 
