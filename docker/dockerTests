@@ -1,0 +1,18 @@
+#!/bin/bash
+## Updated: 12/30/2017
+## Purpose: Run a script against several Docker containers with different OS'
+## Execution: bash dockerTests <script>
+## --------------------------------------------------------------------------
+## Define Variables
+PATH=/usr/local/sbin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+script=$1
+
+## Verify Docker is installed
+if [[ -f /bin/docker ]];then
+	echo "Docker is installed"
+else
+	echo "Docker is not installed"
+fi
+
+## Run the script in different docker containers
+#docker pull
