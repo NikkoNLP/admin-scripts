@@ -1,0 +1,2 @@
+All functions required to install Apache to its fullest capabilities are contained in "apacheFunctions"
+To install Apache run: bash apacheInstall
