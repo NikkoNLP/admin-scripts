@@ -1,0 +1,23 @@
+#!/bin/python
+## Updated: 12/31/2017
+## Purpose: Replace original text with new text in a file
+## Executeion: python revise "<filename>" "<original text>" "<new text"
+## Set Bash alias: alias replace='python /path/to/revise'
+## ------------------------------------------------------
+import fileinput
+import sys
+
+## Define replace function
+def replace(file,original,new):
+    for line in fileinput.input(file, inplace=1):
+        if original in line:
+            line = line.replace(original,new)
+        sys.stdout.write(line)
+
+## Define variables based on user input
+file = sys.argv[1]
+original = sys.argv[2]
+new = sys.argv[3]
+
+## Run the replace function
+replace(file, original, new)
