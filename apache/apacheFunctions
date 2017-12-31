@@ -1,14 +1,15 @@
 #!/bin/bash
 # Updated: 12/30/2017
-# Purpose: Search RPMs for apache versions and install
-# Interactive: Yes
+# Purpose: Library for Apache Functions
 #=====================================================
-### Environment Variables
+### Set Local Environment Variables
 LOG=/var/log/messages
 PATH=/usr/local/sbin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
-## Import Bash Functions
+
+## Import Bash Functions from directory above
 source ../bashFunctions
-## Import functions:
+
+## Run functions to get variable info that will be used later
 checkOS
 softwareCheck
 firewallCheck
@@ -92,8 +93,18 @@ if [[ "$firewall" == "csf" ]];then
 		sed -i '/'"TCP_OUT ="'/c\'"$OUTPORTS"'' /etc/csf/csf.conf
 		csf -r
 	fi
+elif [[ "$firewall" == "firewalld" ]];then
+	firewall-cmd --permanent --zone=public --add-port=80/tcp
+	firewall-cmd --permanent --zone=public --add-port=443/tcp
+	firewall-cmd --reload
 elif [[ "$firewall" == "iptables" ]];then
-	echo "iptables"
+	iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+	iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+	iptables-save | sudo tee /etc/sysconfig/iptables
+	service iptables restart
+elif [[ "$firewall" == "ufw" ]];then
+	ufw allow 80
+	ufw allow 443
 fi
 }
 
